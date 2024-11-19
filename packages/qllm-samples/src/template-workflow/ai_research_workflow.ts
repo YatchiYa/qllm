@@ -5,7 +5,8 @@ import {
   WorkflowDefinition,
   WorkflowStep,
   StepType,
-  LoadDocumentFromTextFile
+  LoadDocumentFromTextFile,
+  SaveDocument
 } from "qllm-lib";
 
 async function main(): Promise<void> {
@@ -234,6 +235,18 @@ async function main(): Promise<void> {
         },
         output: {
           translation: "final_translation"
+        }
+      },
+      {
+        program: new SaveDocument(),
+        type: StepType.ACTION,
+        input: {
+          content: "$final_translation",
+          fileName: "output_test1.txt" //retirer la variable fileName pour le nom du fichier dynamique avec timestamp
+        },
+        output: {
+          path: "saved_file_path", 
+          message: "save_message"
         }
       }
     ]
