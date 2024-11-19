@@ -3,6 +3,9 @@ import {
   TemplateDefinitionBuilder,
   WorkflowManager,
   WorkflowDefinition,
+  WorkflowStep,
+  StepType,
+  LoadDocumentFromTextFile
 } from "qllm-lib";
 
 async function main(): Promise<void> {
@@ -197,10 +200,21 @@ async function main(): Promise<void> {
     defaultProvider: "openai",
     steps: [
       {
+        program: new LoadDocumentFromTextFile(),
+        type: StepType.ACTION,
+        input: {
+          path: "./data/document.txt"
+        },
+        output: {
+          content: "document_content"
+        }
+      },
+      {
         template: learningArticleGenerator,
+        type: StepType.INTERNAL,
         provider: "openai",
         input: {
-          subject: "{{subject}}",
+          subject: "$document_content",
           number_words: "{{number_words}}",
           additional_requirements: "{{additional_requirements}}"
         },
@@ -211,6 +225,7 @@ async function main(): Promise<void> {
       },
       {
         template: languageTranslator,
+        type: StepType.INTERNAL,
         provider: "openai",
         input: {
           text_to_translate: "$learning_article",
@@ -241,12 +256,11 @@ async function main(): Promise<void> {
       "ai_research_workflow",
       workflowInput,
       {
-        onStepStart: (step, index) => {
-          console.log(`\n🔍 Starting step ${index + 1}: ${step.template.name}`);
+        onStepStart: (step: WorkflowStep, index: number) => {
+          console.log(`\n🔍 Starting step ${index + 1}: ${step.template?.name || step.program?.constructor.name}`);
         },
-        onStepComplete: (step, index, result) => {
-          console.log(`\n✅ Completed step ${index + 1}: ${step.template.name}`);
-          console.log(`Result for step ${index + 1}:`, result);
+        onStepComplete: (step: WorkflowStep, index: number) => {
+          console.log(`\n✅ Completed step ${index + 1}: ${step.template?.name || step.program?.constructor.name}`);
         }
       }
     );

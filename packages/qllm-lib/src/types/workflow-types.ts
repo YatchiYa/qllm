@@ -2,8 +2,19 @@
 
 import { TemplateDefinition } from '../templates/types';
 
+export enum StepType {
+    INTERNAL = 'internal',
+    ACTION = 'action'
+}
+
+export interface ActionProgram {
+    execute(input: Record<string, any>): Promise<Record<string, any>>;
+}
+
 export interface WorkflowStep {
-    template: TemplateDefinition;
+    template?: TemplateDefinition;
+    program?: ActionProgram;
+    type: StepType;
     provider?: string;
     input?: Record<string, string | number | boolean>; // Updated to allow more types
     output: string | Record<string, string>;
@@ -18,7 +29,7 @@ export interface WorkflowDefinition {
 }
 
 export interface WorkflowExecutionResult {
-    response: string;
+    response: string | Record<string, any>;
     outputVariables: Record<string, any>;
 }
 

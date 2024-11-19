@@ -14,6 +14,9 @@ export * from './conversation';
 export * from './templates';
 
 export * from "./workflow";
+export * from './workflow/workflow-executor';
+export * from './workflow/workflow-manager';
+export * from './actions';
 
 
 // Main classes and interfaces
@@ -90,3 +93,5 @@ export default {
   createEmbeddingProvider,
   TemplateManager,
 };
+
+export { StepType } from './types/workflow-types';

@@ -2,7 +2,7 @@
 
 import { EventEmitter } from 'events';
 import { TemplateExecutor } from '../templates/template-executor';
-import { WorkflowDefinition, WorkflowStep, WorkflowExecutionContext, WorkflowExecutionResult } from '../types/workflow-types';
+import { WorkflowDefinition, WorkflowStep, WorkflowExecutionContext, WorkflowExecutionResult, StepType } from '../types/workflow-types';
 import { LLMProvider } from '../types';
 import { logger } from '../utils/logger';
 
@@ -39,41 +39,29 @@ export class WorkflowExecutor extends EventEmitter {
 
     for (const [index, step] of workflow.steps.entries()) {
       this.emit('stepStart', step, index);
-      logger.info(`Step ${index + 1}: ${step.template.name}`);
+      logger.info(`Step ${index + 1}: ${step.template?.name || step.program?.constructor.name}`);
 
       try {
         const resolvedInput = await this.resolveStepInputs(step.input || {}, context);
-        const provider = providers[step.provider || workflow.defaultProvider || ''];
+        let executionResult: WorkflowExecutionResult;
 
-        if (!provider) {
-          throw new Error(`Provider not found for step ${index + 1}`);
-        }
-        logger.info(`Step ${index + 1} => resolvedInput: ${JSON.stringify(resolvedInput, null, 2)}`);
-        const result = await this.templateExecutor.execute({
-          template: step.template,
-          provider,
-          variables: resolvedInput,
-          stream: true
-        });
-
-        // logger.info(`Step ${index + 1} => result: ${JSON.stringify(result, null, 2)}`); 
-        const executionResult: WorkflowExecutionResult = {
-          response: result.response,
-          outputVariables: result.outputVariables
-        };
-        logger.info(`Step ${index + 1} => executionResult: ${JSON.stringify(executionResult, null, 2)}`); 
-
-        // Store step results in context
-        if (typeof step.output === 'string') {
-          context.results[step.output] = executionResult;
+        if (step.type === StepType.ACTION && step.program) {
+          const result = await step.program.execute(resolvedInput);
+          executionResult = {
+            response: JSON.stringify(result),
+            outputVariables: result
+          };
+        } else if (step.type === StepType.INTERNAL && step.template) {
+          const provider = providers[step.provider || workflow.defaultProvider || ''];
+          if (!provider) {
+            throw new Error(`Provider not found for step ${index + 1}`);
+          }
+          executionResult = await this.executeTemplateStep(step, provider, resolvedInput);
         } else {
-          Object.entries(step.output).forEach(([key, varName]) => {
-            if (typeof varName === 'string') {
-              context.results[varName] = executionResult.outputVariables[key];
-            }
-          });
+          throw new Error(`Invalid step configuration at index ${index}`);
         }
 
+        this.updateContext(context, step, executionResult);
         this.emit('stepComplete', step, index, executionResult);
         logger.info(`Completed step ${index + 1}`);
 
@@ -86,40 +74,74 @@ export class WorkflowExecutor extends EventEmitter {
     return context.results;
   }
 
-    private resolveTemplateVariables(
-      value: string, 
-      context: Record<string, any>
-    ): string {
-      return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-        return context[key.trim()] || '';
-      });
-    }
-    // src/workflow/workflow-executor.ts
-    private async resolveStepInputs(
-      inputs: Record<string, string | number | boolean>,
-      context: WorkflowExecutionContext
-    ): Promise<Record<string, any>> {
-      const resolved: Record<string, any> = {};
+  private async executeTemplateStep(
+    step: WorkflowStep,
+    provider: LLMProvider,
+    resolvedInput: Record<string, any>
+  ): Promise<WorkflowExecutionResult> {
+    const result = await this.templateExecutor.execute({
+      template: step.template!,
+      provider,
+      variables: resolvedInput,
+      stream: true
+    });
+
+    return {
+      response: result.response,
+      outputVariables: result.outputVariables
+    };
+  }
+
+  private resolveTemplateVariables(
+    value: string, 
+    context: Record<string, any>
+  ): string {
+    return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+      return context[key.trim()] || '';
+    });
+  }
+
+  private async resolveStepInputs(
+    inputs: Record<string, string | number | boolean>,
+    context: WorkflowExecutionContext
+  ): Promise<Record<string, any>> {
+    const resolved: Record<string, any> = {};
     
-      for (const [key, value] of Object.entries(inputs)) {
-        if (typeof value === 'string') {
-          if (value.startsWith('$')) {
-            // Handle reference to previous step output
-            const varName = value.slice(1);
-            resolved[key] = context.results[varName]?.response || 
-                           context.results[varName]?.outputVariables || 
-                           context.results[varName];
-          } else if (value.match(/\{\{.*\}\}/)) {
-            // Handle template variables
-            resolved[key] = this.resolveTemplateVariables(value, context.variables);
-          } else {
-            resolved[key] = value;
-          }
+    for (const [key, value] of Object.entries(inputs)) {
+      if (typeof value === 'string') {
+        if (value.startsWith('$')) {
+          // Handle reference to previous step output
+          const varName = value.slice(1);
+          resolved[key] = context.results[varName]?.response || 
+                         context.results[varName]?.outputVariables || 
+                         context.results[varName];
+        } else if (value.match(/\{\{.*\}\}/)) {
+          // Handle template variables
+          resolved[key] = this.resolveTemplateVariables(value, context.variables);
         } else {
           resolved[key] = value;
         }
+      } else {
+        resolved[key] = value;
       }
-    
-      return resolved;
     }
+    
+    return resolved;
+  }
+
+  private updateContext(
+    context: WorkflowExecutionContext,
+    step: WorkflowStep,
+    executionResult: WorkflowExecutionResult
+  ) {
+    if (typeof step.output === 'string') {
+      context.results[step.output] = executionResult;
+    } else {
+      Object.entries(step.output).forEach(([key, varName]) => {
+        if (typeof varName === 'string') {
+          context.results[varName] = executionResult.outputVariables[key];
+        }
+      });
+    }
+  }
 }
