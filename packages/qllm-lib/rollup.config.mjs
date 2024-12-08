@@ -35,13 +35,22 @@ export default {
     resolve({
       preferBuiltins: true,
     }),
-    commonjs(),
     json(),
     isProduction && terser(),
     analyze({ summaryOnly: true }),
     isProduction && gzip(),
+    commonjs({
+      dynamicRequireTargets: [
+        'node_modules/sqlite3/**/*.js',
+        'node_modules/better-sqlite3/**/*.js'
+      ],
+      ignoreDynamicRequires: true
+    })
   ],
   external: [
+    'sqlite3',
+    'better-sqlite3',
+    'bindings',
     'tiktoken',
     /*    'openai',
     'groq-sdk',

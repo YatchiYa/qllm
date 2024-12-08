@@ -17,8 +17,14 @@ export * from './conversation';
 // Template management
 export * from './templates';
 
+// worflows
 export * from "./workflow";
 
+// agents
+export * from "./agents";
+
+// agents
+export * from "./storage";
 
 // Main classes and interfaces
 import type { LLMProvider, EmbeddingProvider } from './types';

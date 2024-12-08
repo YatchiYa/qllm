@@ -10,6 +10,8 @@
 
 import { StorageProvider } from '../types';
 import { InMemoryStorageProvider } from './in-memory-storage-provider';
+import {SQLiteStorageProvider} from './sqlite-storage-provider';
+
 //import { SQLiteConversationStorageProvider } from './sqlite-conversation-storage-provider';
 
 /**
@@ -37,7 +39,7 @@ export type StorageProviderName = 'in-memory' | 'sqlite';
  * const sqliteStorage = createStorageProvider('sqlite', { dbPath: './conversations.db' });
  * ```
  */
-export default function createStorageProvider(
+export function createStorageProvider(
   name: StorageProviderName,
   {
     dbPath,
@@ -49,12 +51,21 @@ export default function createStorageProvider(
   switch (name.toLowerCase()) {
     case 'in-memory':
       return new InMemoryStorageProvider();
+    case 'sqlite':
+      if (!dbPath) {
+        throw new Error('dbPath must be provided for SQLite storage provider');
+      }
+      return new SQLiteStorageProvider(dbPath);
     case 'local':
       if (!dbPath) {
         throw new Error('dbPath must be provided for SQLite storage provider');
       }
       // ... handle SQLite storage provider ...
       return; // Added return statement for 'local' case
+    default:
+      throw new Error(`Unsupported storage provider: ${name}`);
   }
   return undefined; // Added return statement for cases not handled
 }
+
+export default  createStorageProvider;
