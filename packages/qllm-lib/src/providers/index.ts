@@ -31,6 +31,7 @@ import { GroqProvider } from './qroq';
 import { PerplexityProvider } from './perplexity';
 import { MistralProvider } from './mistral';
 import { OpenRouterProvider } from './openrouter';
+import { DeepSeekProvider } from './deepseek';
 
 /**
  * Returns a sorted list of all available provider names supported by the library.
@@ -50,6 +51,7 @@ export const getListProviderNames = (): string[] => {
     'perplexity',
     'mistral',
     'openrouter',
+    'deepseek'
   ].sort();
   return listProviders;
 };
@@ -91,6 +93,8 @@ export async function getLLMProvider(providerName: string): Promise<LLMProvider>
       return new MistralProvider();
     case 'openrouter':
       return new OpenRouterProvider();
+    case 'deepseek':
+      return new DeepSeekProvider();
     default:
       throw new Error(`Provider "${providerName}" not found.`);
   }
